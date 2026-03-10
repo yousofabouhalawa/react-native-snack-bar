@@ -1,6 +1,5 @@
 package com.snackbar
 
-import android.graphics.Color
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
@@ -30,9 +29,44 @@ class SnackBarViewManager : SimpleViewManager<SnackBarView>(),
     return SnackBarView(context)
   }
 
+  @ReactProp(name = "message")
+  override fun setMessage(view: SnackBarView?, message: String?) {
+    view?.setMessage(message)
+  }
+
+  @ReactProp(name = "visible")
+  override fun setVisible(view: SnackBarView?, visible: Boolean) {
+    view?.setVisible(visible)
+  }
+
+  @ReactProp(name = "duration", defaultInt = 3500)
+  override fun setDuration(view: SnackBarView?, duration: Int) {
+    view?.setDuration(duration)
+  }
+
+  @ReactProp(name = "top", defaultBoolean = false)
+  override fun setTop(view: SnackBarView?, top: Boolean) {
+    view?.setTop(top)
+  }
+
+  @ReactProp(name = "alignX", defaultInt = 1)
+  override fun setAlignX(view: SnackBarView?, value: Int) {
+    view?.setHorizontalAlignment(value)
+  }
+
+  @ReactProp(name = "alignY", defaultInt = 2)
+  override fun setAlignY(view: SnackBarView?, value: Int) {
+    view?.setVerticalAlignment(value)
+  }
+
   @ReactProp(name = "color")
   override fun setColor(view: SnackBarView?, color: Int?) {
-    view?.setBackgroundColor(color ?: Color.TRANSPARENT)
+    view?.setSnackColor(color)
+  }
+
+  @ReactProp(name = "textColor")
+  override fun setTextColor(view: SnackBarView?, color: Int?) {
+    view?.setSnackTextColor(color)
   }
 
   companion object {

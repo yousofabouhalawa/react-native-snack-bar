@@ -3,9 +3,17 @@ import {
   type ColorValue,
   type ViewProps,
 } from 'react-native';
+import type { Int32 } from 'react-native/Libraries/Types/CodegenTypes';
 
-interface NativeProps extends ViewProps {
+export interface SnackBarViewNativeProps extends ViewProps {
+  message?: string;
+  visible?: boolean;
+  duration?: Int32;
+  top?: boolean;
+  alignX?: Int32;
+  alignY?: Int32;
   color?: ColorValue;
+  textColor?: ColorValue;
 }
 
-export default codegenNativeComponent<NativeProps>('SnackBarView');
+export default codegenNativeComponent<SnackBarViewNativeProps>('SnackBarView');
