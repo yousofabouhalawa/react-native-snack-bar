@@ -44,11 +44,6 @@ class SnackBarViewManager : SimpleViewManager<SnackBarView>(),
     view?.setDuration(duration)
   }
 
-  @ReactProp(name = "top", defaultBoolean = false)
-  override fun setTop(view: SnackBarView?, top: Boolean) {
-    view?.setTop(top)
-  }
-
   @ReactProp(name = "alignX", defaultInt = 1)
   override fun setAlignX(view: SnackBarView?, value: Int) {
     view?.setHorizontalAlignment(value)
@@ -67,6 +62,36 @@ class SnackBarViewManager : SimpleViewManager<SnackBarView>(),
   @ReactProp(name = "textColor")
   override fun setTextColor(view: SnackBarView?, color: Int?) {
     view?.setSnackTextColor(color)
+  }
+
+  @ReactProp(name = "animation", defaultInt = 3)
+  override fun setAnimation(view: SnackBarView?, value: Int) {
+    // Custom animation styles are implemented by the iOS native view.
+  }
+
+  @ReactProp(name = "animationDuration", defaultInt = 350)
+  override fun setAnimationDuration(view: SnackBarView?, value: Int) {
+    // Custom animation duration is implemented by the iOS native view.
+  }
+
+  @ReactProp(name = "appearance", defaultInt = 0)
+  override fun setAppearance(view: SnackBarView?, value: Int) {
+    // Liquid Glass appearance is implemented by the iOS native view.
+  }
+
+  @ReactProp(name = "glassStyle", defaultInt = 0)
+  override fun setGlassStyle(view: SnackBarView?, value: Int) {
+    // Liquid Glass styles are implemented by the iOS native view.
+  }
+
+  @ReactProp(name = "glassTintColor")
+  override fun setGlassTintColor(view: SnackBarView?, color: Int?) {
+    // Liquid Glass tint is implemented by the iOS native view.
+  }
+
+  @ReactProp(name = "glassInteractive", defaultBoolean = false)
+  override fun setGlassInteractive(view: SnackBarView?, interactive: Boolean) {
+    // Interactive Liquid Glass is implemented by the iOS native view.
   }
 
   companion object {

@@ -9,11 +9,16 @@ export interface SnackBarViewNativeProps extends ViewProps {
   message?: string;
   visible?: boolean;
   duration?: Int32;
-  top?: boolean;
   alignX?: Int32;
   alignY?: Int32;
   color?: ColorValue;
   textColor?: ColorValue;
+  animation?: Int32;
+  animationDuration?: Int32;
+  appearance?: Int32;
+  glassStyle?: Int32;
+  glassTintColor?: ColorValue;
+  glassInteractive?: boolean;
 }
 
 export default codegenNativeComponent<SnackBarViewNativeProps>('SnackBarView');

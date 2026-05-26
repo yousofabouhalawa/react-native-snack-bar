@@ -8,18 +8,33 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import com.facebook.react.uimanager.PointerEvents
+import com.facebook.react.uimanager.ReactPointerEventsView
 import com.google.android.material.snackbar.Snackbar
 
-class SnackBarView : FrameLayout {
+class SnackBarView : FrameLayout, ReactPointerEventsView {
+  private data class Presentation(
+    val message: String,
+    val durationMs: Int,
+    val horizontalAlignment: Int,
+    val verticalAlignment: Int,
+    val backgroundColor: Int?,
+    val textColor: Int?
+  )
+
   private var snackbar: Snackbar? = null
+  private var displayedPresentation: Presentation? = null
+  private var replacementInProgress: Boolean = false
+  private var renderScheduled: Boolean = false
   private var message: String = ""
   private var visible: Boolean = false
   private var durationMs: Int = 3500
-  private var top: Boolean = false
   private var horizontalAlignment: Int = ALIGNMENT_CENTER
   private var verticalAlignment: Int = ALIGNMENT_BOTTOM
   private var backgroundColor: Int? = null
   private var textColor: Int? = null
+
+  override val pointerEvents: PointerEvents = PointerEvents.NONE
 
   constructor(context: Context) : super(context)
   constructor(context: Context, attrs: AttributeSet?) : super(context, attrs)
@@ -31,54 +46,58 @@ class SnackBarView : FrameLayout {
 
   fun setMessage(value: String?) {
     message = value?.trim().orEmpty()
-    render()
+    requestRender()
   }
 
   fun setVisible(value: Boolean) {
     visible = value
-    render()
+    requestRender()
   }
 
   fun setDuration(value: Int) {
     durationMs = value.coerceAtLeast(0)
-    render()
-  }
-
-  fun setTop(value: Boolean) {
-    top = value
-    verticalAlignment = if (value) ALIGNMENT_TOP else ALIGNMENT_BOTTOM
-    render()
+    requestRender()
   }
 
   fun setHorizontalAlignment(value: Int) {
     horizontalAlignment = sanitizeAlignment(value, ALIGNMENT_CENTER)
-    render()
+    requestRender()
   }
 
   fun setVerticalAlignment(value: Int) {
     verticalAlignment = sanitizeAlignment(value, ALIGNMENT_BOTTOM)
-    top = verticalAlignment == ALIGNMENT_TOP
-    render()
+    requestRender()
   }
 
   fun setSnackColor(value: Int?) {
     backgroundColor = value
-    render()
+    requestRender()
   }
 
   fun setSnackTextColor(value: Int?) {
     textColor = value
-    render()
+    requestRender()
   }
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
-    render()
+    requestRender()
   }
 
   override fun onDetachedFromWindow() {
     dismissSnackbar()
     super.onDetachedFromWindow()
+  }
+
+  private fun requestRender() {
+    if (renderScheduled) {
+      return
+    }
+    renderScheduled = true
+    post {
+      renderScheduled = false
+      render()
+    }
   }
 
   private fun render() {
@@ -91,18 +110,52 @@ class SnackBarView : FrameLayout {
       return
     }
 
-    showSnackbar()
-  }
-
-  private fun showSnackbar() {
-    val snack = snackbar ?: Snackbar.make(this, message, Snackbar.LENGTH_SHORT).also {
-      snackbar = it
+    val presentation = currentPresentation()
+    if (snackbar == null) {
+      showSnackbar(presentation)
+      return
     }
 
-    snack.setText(message)
-    snack.duration = durationMs
+    if (displayedPresentation != presentation) {
+      replaceSnackbar()
+    }
+  }
 
-    backgroundColor?.let { snack.setBackgroundTint(it) }
+  private fun currentPresentation(): Presentation {
+    return Presentation(
+      message,
+      durationMs,
+      horizontalAlignment,
+      verticalAlignment,
+      backgroundColor,
+      textColor
+    )
+  }
+
+  private fun showSnackbar(presentation: Presentation) {
+    val snack = Snackbar.make(this, presentation.message, Snackbar.LENGTH_SHORT).also { createdSnack ->
+      snackbar = createdSnack
+      displayedPresentation = presentation
+      createdSnack.addCallback(object : Snackbar.Callback() {
+        override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
+          if (snackbar !== createdSnack) {
+            return
+          }
+          snackbar = null
+          displayedPresentation = null
+          if (replacementInProgress) {
+            replacementInProgress = false
+            requestRender()
+          }
+        }
+      })
+    }
+
+    snack.setText(presentation.message)
+    snack.duration =
+      if (presentation.durationMs == 0) Snackbar.LENGTH_INDEFINITE else presentation.durationMs
+
+    presentation.backgroundColor?.let { snack.setBackgroundTint(it) }
     val textView = snack.view.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)
     textView?.maxLines = Int.MAX_VALUE
     textView?.setSingleLine(false)
@@ -113,7 +166,7 @@ class SnackBarView : FrameLayout {
       textView?.hyphenationFrequency = Layout.HYPHENATION_FREQUENCY_NORMAL
     }
 
-    textColor?.let { color ->
+    presentation.textColor?.let { color ->
       snack.setTextColor(color)
       textView?.setTextColor(color)
     }
@@ -121,7 +174,8 @@ class SnackBarView : FrameLayout {
     val layoutParams = snack.view.layoutParams
     when (layoutParams) {
       is FrameLayout.LayoutParams -> {
-        layoutParams.gravity = horizontalGravity() or verticalGravity()
+        layoutParams.gravity = horizontalGravity(presentation.horizontalAlignment) or
+          verticalGravity(presentation.verticalAlignment)
         layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
         val edgeMargin = dpToPx(12)
         val verticalMargin = dpToPx(8)
@@ -130,7 +184,8 @@ class SnackBarView : FrameLayout {
       }
 
       is CoordinatorLayout.LayoutParams -> {
-        layoutParams.gravity = horizontalGravity() or verticalGravity()
+        layoutParams.gravity = horizontalGravity(presentation.horizontalAlignment) or
+          verticalGravity(presentation.verticalAlignment)
         layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
         val edgeMargin = dpToPx(12)
         val verticalMargin = dpToPx(8)
@@ -139,26 +194,42 @@ class SnackBarView : FrameLayout {
       }
     }
 
-    if (!snack.isShown) {
-      snack.show()
+    snack.show()
+  }
+
+  private fun replaceSnackbar() {
+    if (replacementInProgress) {
+      return
     }
+
+    val activeSnackbar = snackbar
+    if (activeSnackbar == null) {
+      requestRender()
+      return
+    }
+
+    replacementInProgress = true
+    activeSnackbar.dismiss()
   }
 
   private fun dismissSnackbar() {
-    snackbar?.dismiss()
+    val activeSnackbar = snackbar
     snackbar = null
+    displayedPresentation = null
+    replacementInProgress = false
+    activeSnackbar?.dismiss()
   }
 
-  private fun horizontalGravity(): Int {
-    return when (horizontalAlignment) {
+  private fun horizontalGravity(alignment: Int): Int {
+    return when (alignment) {
       ALIGNMENT_LEFT -> Gravity.START
       ALIGNMENT_RIGHT -> Gravity.END
       else -> Gravity.CENTER_HORIZONTAL
     }
   }
 
-  private fun verticalGravity(): Int {
-    return when (verticalAlignment) {
+  private fun verticalGravity(alignment: Int): Int {
+    return when (alignment) {
       ALIGNMENT_TOP -> Gravity.TOP
       ALIGNMENT_CENTER -> Gravity.CENTER_VERTICAL
       else -> Gravity.BOTTOM

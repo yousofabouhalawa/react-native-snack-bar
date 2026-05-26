@@ -1,59 +1,100 @@
-import SnackBarViewNativeComponent, {
-  type SnackBarViewNativeProps,
-} from './SnackBarViewNativeComponent';
-import { StyleSheet } from 'react-native';
+import { NativeModules, processColor, type ColorValue } from 'react-native';
 
-export type SnackBarHorizontalAlignment = 'left' | 'center' | 'right';
-export type SnackBarVerticalAlignment = 'top' | 'center' | 'bottom';
+export type SnackBarAnimation = 'fade' | 'slide';
+export type SnackBarAppearance = 'clear-glass' | 'regular-glass' | 'solid';
 
-export interface SnackBarViewProps
-  extends Omit<SnackBarViewNativeProps, 'alignX' | 'alignY'> {
-  horizontalAlignment?: SnackBarHorizontalAlignment;
-  verticalAlignment?: SnackBarVerticalAlignment;
+export interface SnackBarOptions {
+  duration?: number;
+  animation?: SnackBarAnimation;
+  animationDuration?: number;
+  appearance?: SnackBarAppearance;
+  tintColor?: ColorValue;
+  interactive?: boolean;
+  backgroundColor?: ColorValue;
+  textColor?: ColorValue;
 }
 
-const horizontalAlignmentMap: Record<SnackBarHorizontalAlignment, number> = {
-  left: 0,
-  center: 1,
-  right: 2,
-};
-
-const verticalAlignmentMap: Record<SnackBarVerticalAlignment, number> = {
-  top: 0,
-  center: 1,
-  bottom: 2,
-};
-
-export function SnackBarView({
-  horizontalAlignment = 'center',
-  verticalAlignment = 'bottom',
-  top,
-  pointerEvents = 'none',
-  style,
-  ...rest
-}: SnackBarViewProps) {
-  const resolvedVerticalAlignment = top ? 'top' : verticalAlignment;
-
-  return (
-    <SnackBarViewNativeComponent
-      {...rest}
-      top={top}
-      pointerEvents={pointerEvents}
-      style={[styles.overlayHost, style]}
-      alignX={horizontalAlignmentMap[horizontalAlignment]}
-      alignY={verticalAlignmentMap[resolvedVerticalAlignment]}
-    />
-  );
+interface NativeSnackBarOptions {
+  duration: number;
+  animation: number;
+  animationDuration: number;
+  appearance: number;
+  glassStyle: number;
+  glassInteractive: boolean;
+  color?: ReturnType<typeof processColor>;
+  textColor?: ReturnType<typeof processColor>;
+  glassTintColor?: ReturnType<typeof processColor>;
 }
 
-export { SnackBarViewNativeComponent };
+interface NativeSnackBarModule {
+  show(message: string, options: NativeSnackBarOptions): void;
+  dismiss(): void;
+}
 
-const styles = StyleSheet.create({
-  overlayHost: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
+const animationMap: Record<SnackBarAnimation, number> = {
+  fade: 1,
+  slide: 2,
+};
+
+function nativeModule(): NativeSnackBarModule {
+  const module = NativeModules.SnackBar as NativeSnackBarModule | undefined;
+  if (!module) {
+    throw new Error(
+      'react-native-snack-bar is not linked. Rebuild the native app after installing the package.'
+    );
+  }
+  return module;
+}
+
+function nativeOptions(options: SnackBarOptions): NativeSnackBarOptions {
+  const appearance = options.appearance ?? 'clear-glass';
+  const normalized: NativeSnackBarOptions = {
+    duration: Math.max(0, options.duration ?? 3500),
+    animation: animationMap[options.animation ?? 'slide'],
+    animationDuration: Math.max(0, options.animationDuration ?? 350),
+    appearance: appearance === 'solid' ? 1 : 0,
+    glassStyle: appearance === 'regular-glass' ? 1 : 0,
+    glassInteractive: options.interactive ?? false,
+  };
+
+  if (options.backgroundColor !== undefined) {
+    normalized.color = processColor(options.backgroundColor);
+  }
+  if (options.textColor !== undefined) {
+    normalized.textColor = processColor(options.textColor);
+  }
+  if (options.tintColor !== undefined) {
+    normalized.glassTintColor = processColor(options.tintColor);
+  }
+
+  return normalized;
+}
+
+export const SnackBar = {
+  show(message: string, options: SnackBarOptions = {}): void {
+    if (message.trim().length === 0) {
+      nativeModule().dismiss();
+      return;
+    }
+
+    nativeModule().show(message, nativeOptions(options));
   },
-});
+
+  dismiss(): void {
+    nativeModule().dismiss();
+  },
+};
+
+interface ToastFunction {
+  (message: string, options?: SnackBarOptions): void;
+  dismiss(): void;
+}
+
+export const toast: ToastFunction = Object.assign(
+  (message: string, options?: SnackBarOptions) => {
+    SnackBar.show(message, options);
+  },
+  {
+    dismiss: () => SnackBar.dismiss(),
+  }
+);
